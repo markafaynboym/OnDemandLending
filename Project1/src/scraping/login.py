@@ -19,6 +19,7 @@ def login(driver, wait):
     email = os.getenv("SCRAPER_EMAIL")
     password = os.getenv("SCRAPER_PASSWORD")  # Not used yet, but ready for next step
     time.sleep(1)
+    wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
     # Navigate to login page
     driver.get("https://ondemand.lodasoft.com/login")
     print("🔗 Navigated to login page")

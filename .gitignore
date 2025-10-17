@@ -1,5 +1,7 @@
 .DS_Store
-Project1/credentials.json
+credentials.json
+Project1/notebooks/AnalyzeMailData*
+Project1/notebooks/CleanRawMailData_Scratch.ipynb
 data/
 data
 .env
@@ -8,3 +10,5 @@ venv/
 venv/*
 .venv/
 .venv
+.Rproj.user
+*.pyc

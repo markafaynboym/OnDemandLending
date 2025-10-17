@@ -49,8 +49,11 @@ def scrape_loanstatus(driver, wait, download_dir):
     # Wait for final spinner and table to render
     wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "ngx-spinner-overlay")))
     wait.until(EC.presence_of_element_located((By.XPATH, "//table[contains(@class, 'table')]//tbody/tr")))
-    time.sleep(1)
+    time.sleep(2)
 
+    # Wait for spinner overlay to disappear
+    wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "spinner-overlay")))
+    time.sleep(2)
     # Click 'Export To CSV'
     wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'btn-primary') and contains(text(), 'Export To CSV')]"))).click()
     time.sleep(1.5)

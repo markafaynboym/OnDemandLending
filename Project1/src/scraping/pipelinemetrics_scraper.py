@@ -78,8 +78,8 @@ def scrape_pipeline_metrics(driver, wait, download_dir):
         arguments[0].value = arguments[1];
         arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
         arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
-    """, from_input, "2024-03-28")
-    print("📅 'From' date set to 03/28/2024")
+    """, from_input, "2023-01-01")
+    print("📅 'From' date set to 01/01/2023 MM/DD/YYYY")
     time.sleep(2)
     driver.find_element(By.TAG_NAME, "body").click()
     time.sleep(2)  # Let layout settle
