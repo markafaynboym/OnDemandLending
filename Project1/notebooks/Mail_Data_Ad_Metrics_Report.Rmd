@@ -1,7 +1,7 @@
 ---
 title: "📊 Mail Data Ad Metrics"
 author: "Mark Faynboym"
-date: "2025-10-11"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output: 
   html_document:
     toc: true
@@ -28,28 +28,21 @@ We scrape the following OnDemandLending Mail Data from Lodasoft...
 - Loans funded
 - Total Mail Count (manually entered)
 
-
 ## 🎯 Objective: Ad Metrics
 
-We are investigating the effectiveness of our ad campaigns from OndemandLending's marketing contractors (e.g., **Amsive**, **Camber**).  
+We are investigating the effectiveness of our ad campaigns from OndemandLending's marketing contractors 
 
 The goal is to understand how well our ad spend is performing by evaluating the following metrics:
 
 - 📞 **Response Rate: **What is the percentage of calls we get by ad company?
 - 🔒 **Call to Lock Rate: ** How many calls turn into locks
 - 💰  **Lock to Fund Rate: ** How many locks convert to a funded loan
-
-We then do <u>further investigation</u>. We look at 
-
 - *Total-Mail-To-Fund: * to look at direct imact of Total mail on funding loans
 - *Further exploration: * to see if we can do insights on campaign data that has been given time to reach its clients and it's efficiency on loan-funding. 
 
 We end with a Conclusion, further questions, considerations and fix-me's to improve upon our current analysis.
 
 Feel free to toggle on the table-of-contents to move from one section to another.
-
-
-
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
@@ -61,8 +54,6 @@ library(kableExtra)
 library(DT)
 library(patchwork)
 ```
-
-
 
 ```{r}
 # Load MailData.csv from 'data/processed' folder
@@ -76,8 +67,8 @@ maildata <- read_csv("../../data/processed/MailData.csv")
 maildata <- janitor::clean_names(maildata)
 
 # Convert date column
-maildata <- maildata %>%
-  mutate(mail_date = mdy(mail_date))
+# maildata <- maildata %>%
+#   mutate(mail_date = mdy(mail_date))
 
 # Convert percentage columns to numeric
 percent_cols <- c("response_rate", "call_to_lock", "lock_to_fund")
@@ -89,9 +80,12 @@ numeric_cols <- c("calls", "locks", "fundings")
 maildata <- maildata %>%
   mutate(across(all_of(numeric_cols), ~ as.numeric(.)))
 
-# Create Mail Multiplier column
 maildata <- maildata %>%
-  mutate(mail_multiplier = round(10000 / total_mail_pieces, 2))
+  mutate(mail_multiplier = case_when(
+    is.na(total_mail_pieces) ~ NA_real_,         # Handle missing values
+    total_mail_pieces == 0 ~ NA_real_,           # Prevent division by zero
+    TRUE ~ round(10000 / total_mail_pieces, 2)   # Safe division
+  ))
 
 # Apply multiplier to selected columns
 scaled_cols <- c("calls", "locks", "fundings")
@@ -104,30 +98,34 @@ maildata <- maildata %>%
 
 First we generate a table to easily look through and compare values. 
 
-From the start of the year, we have campaigns going back as far as 03/28/2024 so our mail data is generated from 03/28/2024 to capture all of the calls possible for each campaign.
-
-
-**Please note** that there are some campaigns with NO TOTAL MAIL PIECE VALUES. A separate table is at the bottom of the report of all instances. Please make sure to update. For now we will ignore missing values
+**Please note** that there are some campaigns with NO TOTAL MAIL PIECE VALUES. A separate table is at the bottom of the report of all instances. Please make sure to update the Total Mail Pieces values. For now we will ignore missing values
 
 # Mail Data Table
-
+If you want the colored table, please find it in this googlesheet. Use the sheet with the newest date 
+https://docs.google.com/spreadsheets/d/10VvrSzbbMOW8qdFZzxWBeUl8HO4qnqXDH-B_2vL8PlI/edit?usp=sharing 
 
 ```{r}
 
-# Render searchable table with column filters
+# 🟩 Render searchable table with column filters
 datatable(
   maildata,
-  filter = "top",  # 👈 adds search boxes at the top of each column
+  filter = "top", 
   options = list(
     pageLength = 5,
-    scrollX = TRUE
+    scrollX = TRUE,
+    dom = 'Bfrtip',  # 👈 enables buttons
+    buttons = c('copy', 'csv', 'excel', 'pdf', 'print')  # 👈 export formats
   ),
+  extensions = 'Buttons',
   rownames = FALSE,
-  caption = "📋 Amsive Campaign Table with Column Filters"
+  caption = "📋 Mail Data"
 )
+
 ```
 
 Now, lets look at the metrics; the response rate, call-to-lock rate and the lock-to-fund rate. 
+
+Recall we've decided to only look at metrics in 2025 as the last year is irrelevant in our data
 
 ```{r}
 # Prepare data
@@ -142,8 +140,6 @@ plot_data <- maildata  %>%   arrange(mail_date) %>%
 # Response Rate
 
 ### Bar graph
-
-We first look at the entire timeline to view data exhaustively. And notice we should only be looking at data, mainly for Camber and Amsive from the start of 2025
 
 
 ```{r}
@@ -168,15 +164,13 @@ scale_fill_manual(values = c(
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # Make it interactive
-ggplotly(p)
+#ggplotly(p)
 ```
 
-
-So we do just that. 
-Two observations made here
+ 
 1) Camber outperforms Amsive significantly in each campaign.
 
-2) Each campaign has a decreasing trend. This makes sense because campaigns that have been out longer have more time to reach slow-responding clients.
+2) Each campaign has a decreasing trend. This makes sense because campaigns that have been out longer have more time to reach slow-responding clients (longer exposure to market).
 
 ```{r}
 # 🟩 Ensure mail_date is a proper Date
@@ -194,9 +188,9 @@ scale_fill_manual(values = c(
   "Other" = "#979d5d"
 )) +
   labs(
-    title = "📊 Response rate by Campaign (From 04/30/2025)",
+    title = "📊 Response rate by Campaign (2025)",
     x = "Mail Date",
-    y = "FResponse Rate (%) (%)",
+    y = "Response Rate (%)",
     fill = "Campaign"
   ) +
   theme_minimal(base_size = 14) +
@@ -206,7 +200,7 @@ ggplotly(p)
 ```
 
 
-To have a better visual we make a box plot to look at our values. We only use the dates after 04/30/2025 where both campaigns have roughly the same start times.
+To have a better visual we make a box plot to look at our values. We only use the dates after 05/05/2025 where both campaigns have roughly the same start times. We don't want earlier Amsive data to ruin our comparison.
 
 Observations: 
 Camber is significantly outperforming Amsive
@@ -240,7 +234,13 @@ ggplotly(p)
 
 ### Test of campaigns being equal ( favor is in Camber)
 
+**Note to the statistician / data scientist. 
 With observations of about 60 total (30 each) a Welch's t-test is appropriate as unequal variance is a possibilty. (Unlike Gosset's Student's t-test which assumes equal variance)
+
+if n > 30 , we can make the assumption that for CLT the sample mean follows a normal distribution. It does not mean the values themselves are normal. At the time of be writing this, n = 78 thus using the Welch's t-test is considered appropriate. 
+** End Note
+
+The probability of observing a difference as extreme or more extreme for Camber and Amsive in response rate is the p-value. At the time of this writing it is 0.007 which is 0.7% chance --> Camber is significantly better than Amsive at Response rates
 
 
 ```{r}
@@ -252,21 +252,22 @@ camber_calls <- plot_data$calls_per_10k[plot_data$campaign_name == "Camber"]
 t.test(amsive_calls, camber_calls,
        alternative = "two.sided",
        var.equal = FALSE)  # Welch's t-test (default)
-
-# Step 3: Run one sided test t-test
-t.test(camber_calls,amsive_calls, 
-       alternative = "greater",
-       var.equal = FALSE)  # Welch's t-test (default)
+# 
+# # Step 3: Run one sided test t-test
+# t.test(camber_calls,amsive_calls, 
+#        alternative = "greater",
+#        var.equal = FALSE)  # Welch's t-test (default)
 ```
 
 
 # Call-To-Lock
 
-We will continue using the date cut-off of 04/30/2025
+We will continue to Call-to-Lock
 
 ### Bar Graph
 
-By looking at the bar graph, we can not draw any conclusive evidence. Let's try a box plot
+By looking at the bar graph, we can see Amsive doing better than Camber but not definitively. 
+Let's try a box plot
 
 ```{r}
 p <- ggplot(plot_data_datecutoff, aes(x = mail_date, y = call_to_lock, fill = campaign_name)) +
@@ -279,7 +280,7 @@ scale_fill_manual(values = c(
   "Other" = "#979d5d"
 )) +
   labs(
-    title = "📊 Call-To_lock by Campaign (From 04/30/2025)",
+    title = "📊 Call-To_lock by Campaign (From 05/05/2025)",
     x = "Mail Date",
     y = "Calls-To-Lock (%)",
     fill = "Campaign"
@@ -292,7 +293,7 @@ ggplotly(p)
 
 ### Box Plot
 
-With our box plot we see an interesting change-up. Amsive seems to be outperforming in the call-to-lock portion of our loan pipeline with the median in Amsive being above the 75th percentile in Camber. 
+With our box plot we see  Amsive seems to be doing slightly better in the call-to-lock portion of our loan pipeline. 
 
 ```{r}
 # 🟩 Build ggplot BoxPlot
@@ -316,7 +317,7 @@ p <- ggplot(plot_data_datecutoff %>% filter(!is.na(calls)), aes(x = campaign_nam
 ggplotly(p)
 ```
 
-The tests show that it isn't an anomaly for Amsive to be greater than Camber but still p-value is showing there is something to consider.
+The hypothesis test shows that theres  a 22% of observing the difference betweenCamber and Amsive performance in Call-to-Lock assuming true means are equal. (Much less than 0.7% in Response rate, not significant)
 
 ```{r}
 # Step 2: Split into groups
@@ -328,10 +329,10 @@ t.test(amsive_calltolock, camber_calltolock,
        alternative = "two.sided",
        var.equal = FALSE)  # Welch's t-test (default)
 
-# Step 3: Run one sided test t-test
-t.test(camber_calltolock,amsive_calltolock, 
-       alternative = "greater",
-       var.equal = FALSE)  # Welch's t-test (default)
+# # Step 3: Run one sided test t-test
+# t.test(camber_calltolock,amsive_calltolock, 
+#        alternative = "greater",
+#        var.equal = FALSE)  # Welch's t-test (default)
 ```
 
 
@@ -341,6 +342,7 @@ t.test(camber_calltolock,amsive_calltolock,
 Now we view the final metric, Lock-To-Fund
 
 ### Bar Graph
+We don't see too much difference here.
 
 ```{r}
 p <- ggplot(plot_data_datecutoff, aes(x = mail_date, y = lock_to_fund, fill = campaign_name)) +
@@ -366,7 +368,7 @@ ggplotly(p)
 
 ### Box plot
 
-Similar to our Call-To-Lock we see that Amsive has some better performance in the Lock-To-Fund portion of the loan pipeline. We should consider that these results may change as more data is gathered in time. 
+The box plot shows higher variability in Lock-To-Fund rates but a lower median. Amsive has a better consistency (less fluctuations.) 
 
 ```{r}
 # 🟩 Build ggplot BoxPlot
@@ -482,9 +484,9 @@ subplot(list(box_response, box_call_to_lock, box_lock_to_fund))
 
 # Total Mail to Fund 
 
-Seeing as how Camber and Amsive each have a portion of the pipeline that they perform better at than their competitor, we will attempt to view the crux of our problem, seeing how much cost (in our case, total mail advertising) we need to input for loans to fund.
+We can't see whether it's Camber or Amsive that's better so we'll look at our money in and money out values, our fundings and total mail sent out.
 
-We calculate the total fund by 10,000 total mail to make valid comparisons. Observations show Camber may be performing better than Amsive when looking at campaigns that have been given some time to have maximum exposure to the market. We'll continue to explore.
+We calculate the total fund by 10,000 total mail to make valid comparisons. Observations show Camber may be performing slightly better than Amsive when looking at campaigns that have been given some time to have maximum exposure to the market. We'll continue to explore.
 
 ```{r}
 p <- ggplot(plot_data_datecutoff, aes(x = mail_date, y = fundings_per_10k, fill = campaign_name)) +
@@ -508,6 +510,8 @@ scale_fill_manual(values = c(
 ggplotly(p)
 ```
 
+In our box plot we see medians being about the same with Amsive having a slightly higher distribution. (In slight favor of Amsive)
+
 ```{r}
 # 🟩 Build ggplot BoxPlot
 p <- ggplot(plot_data_datecutoff %>% filter(!is.na(calls)), aes(x = campaign_name, y = fundings_per_10k, fill = campaign_name)) +
@@ -529,7 +533,6 @@ p <- ggplot(plot_data_datecutoff %>% filter(!is.na(calls)), aes(x = campaign_nam
 # Make it interactive
 ggplotly(p)
 ```
-
 
 # Additional Exploration
 
@@ -568,9 +571,7 @@ box_monthly <- ggplotly(
 
 ### Monthly performance of number of funded loans per 10,000 total mail
 
-We explore further to see if any patterns emerge when looking at efficiency by month or within the summer time frame.
-
-The monthly funding bar chart seen below that approximates the number of fundings one would get per 10,000 total mail sent out, we are seeing that as time goes on, Camber may in fact outperform Amsive though that remains to be seen in time.
+The monthly funding bar chart seen below (Fundings per 10,000 total mail in a given month),  we are seeing that as time goes on, Camber may be outperforming Amsive though that remains to be seen in time.
 
 
 ```{r}
@@ -578,9 +579,7 @@ bar_monthly
 ```
 ### Summer mail data analysis
 
-Furthermore, we narrow down our data to between 04/03/2025 - 08-01-2025. This is done because enough time has gone by to where our ad campaigns have had enough exposure.
-
-We see that based on amount of mail sent out, that Camber looks to have better leads as more loans are funded per 10,000 mail sent. This may be worth looking into more.
+Furthermore, we narrow down our data to between 05/05/2025 - 08-01-2025 and consider how much mail has been sent out. Wee see there has been more Amsive than Camber sent out in the beginning but now the advertisements are evening out.
 
 ```{r}
 p <- ggplot(plot_data_datecutoff %>% filter( mail_date <= as.Date("2025-08-01")), aes(x = mail_date , y = total_mail_pieces, fill = campaign_name)) +
@@ -604,6 +603,10 @@ scale_fill_manual(values = c(
 ggplotly(p)
 ```
 
+It should be noted that Camber has shown to be more effective with smaller amounts of mail.
+
+Are ad campaigns less efficient when you send out more mail? After a certain amount of mail sent out, are the people that they select of lower lead quality? 
+THIS IS WORTH CONSIDERING
 
 ```{r}
 p <- ggplot(plot_data_datecutoff %>% filter( mail_date <= as.Date("2025-08-01")), aes(x = total_mail_pieces, y = fundings_per_10k, fill = campaign_name)) +
@@ -627,9 +630,10 @@ scale_fill_manual(values = c(
 ggplotly(p)
 ```
 
+From 05/05/2025 when Camber campaigns start running, we see a higher median and upside distribution to Amsive. These are the longest exposed campaigns which could indicate favor to Camber. We will want to wait and see how newer campaigns do over the next year.
 
 ```{r}
-p <- ggplot(plot_data_datecutoff %>% filter( mail_date <= as.Date("2025-08-01")), aes(x = campaign_name, y = fundings_per_10k, fill = campaign_name)) +
+p <- ggplot(plot_data_datecutoff %>% filter( mail_date <= as.Date("2025-07-01")), aes(x = campaign_name, y = fundings_per_10k, fill = campaign_name)) +
   scale_fill_manual(values = c(
   "Camber" = "#E26E5F",   
   "Amsive" = "#44CDDA" ,
@@ -638,7 +642,7 @@ p <- ggplot(plot_data_datecutoff %>% filter( mail_date <= as.Date("2025-08-01"))
   "Other" = "#979d5d"
 )) +
   geom_boxplot(alpha = 0.7, color = "gray20") +
-  labs(title = "📊 Total Mail-To-Fund by Campaign (05/05/2025 - 08-01-2025)",
+  labs(title = "📊 Total Mail-To-Fund by Campaign (Summer 2025)",
     x = "Mail Date",
     y = "Total Mail-To-Fund (%)",,
        fill = "Campaign") +
@@ -654,28 +658,18 @@ ggplotly(p)
 
 So far, here are the observations that we see. 
 
-When comparing Camber to Amsive which are our two dominant campaign ad agencies, we notice Camber out-performs Amsive when it comes to the number of calls we get per total mail sent, however under performs when it comes to conversion to locks and funds. 
+When comparing Camber to Amsive which are our two dominant campaign ad agencies, we notice Camber out-performs Amsive when it comes to the number of calls we get per total mail sent, however under performs when it comes to conversion to locks and not much of a difference when converting locks to funds. 
 
-When by-passing all of the metrics and directly looking at Total mail sent conversion to Funded loans, we see that Amsive does only slightly better 
+When looking directly at Total mail sent conversion to Funded loans, we see that Camber is doing better given enough time goes by in the campaign.
 
-**Important** We should probably be observing performance with respect to time, older ad campaigns have more funded loans. So we will need to review after some time has passed to see which loans will fund from our newer campaigns. 
 
 # Further questions
 
-1) What do we know about Camber and Amsive? Or other ad agencies? Is there anything we know that one does over the other that can help us?
-
-2) Will these types of reports be better weekly or monthly? At least for measuring one agency against another. We can create other reports weekly for # calls, calls per loan officer etc...
-
-3) Why is early summer performance better than later summer performance? Is this an industry pattern? Are there economic factors that could be at play?
 
 # Future considerations.
-- 📈 Campaign ROI (Add in the cost of each type of ad)
-- Look at loan amount distribution
-- How much can we play around with ad metrics (which locations mail is sent to, time of day etc...)
-- 🧠 Lead quality score 
-- Monster total mail count needs to be populated
-- Total volume of calls, locks, funds
-- When we get more data, it might be wise to match against industry predictions of rates to know when to deploy more or less marketing.
+- Check the average loan amount of Camber vs Amsive. (Loan amount distribution)
+- Which states have the most funded loans?
+- Total volume of calls, locks, funds by month
 
 # Fix Me 
 
@@ -683,7 +677,7 @@ We have some mailing campaign dates unaccounted for that could help us in future
 
 ```{r}
 # NA values Need to either ignore these or populate the total mail pieces(Lower case and no spaces for snake type)
-maildata_totalmail_na <- maildata %>% filter(is.na(total_mail_pieces))
+maildata_totalmail_na <- maildata %>% filter(total_mail_pieces==0) %>% mutate(total_mail_pieces = NA_integer_)
 
 
 # 🟩 Render searchable table with column filters
