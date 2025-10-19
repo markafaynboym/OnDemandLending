@@ -90,11 +90,6 @@ def scrape_pipeline_metrics(driver, wait, download_dir):
         (By.XPATH, "//h4[.//span[text()='Pipeline Metrics']]//select"))
     )
     select = Select(dropdown)
-
-    # Log all options to confirm visibility
-    for i, opt in enumerate(select.options):
-        print(f"[{i}] {opt.text.strip()} → {opt.get_attribute('value')}")
-
     # Select by visible text (robust against value changes)
     select.select_by_visible_text("Lead Ref ID")
     print("✅ 'Lead Ref ID' selected by visible text")

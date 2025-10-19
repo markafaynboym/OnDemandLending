@@ -198,8 +198,7 @@ def generate_maildata():
 
 
     df_loanstatus_modded_clean  = df_loanstatus_modded[["Name", "loanStatusName","Campaign Name", "Mail Date", "funded_flag", "withdrawn_flag" , "locked_not_submitted_flag", "total",  "Loan Officer"]].copy()
-
-    df_loanstatus_modded_clean["Mail Date"] = pd.to_datetime(df_loanstatus_modded_clean["Mail Date"], errors="coerce")
+    df_loanstatus_modded_clean["Mail Date"] = pd.to_datetime(df_loanstatus_modded_clean["Mail Date"],format="%m/%d/%Y",errors="coerce")
 
     # Group by 'Campaign Name' and 'Mail Date', then sum the relevant flags to create loan status stats 
     FundedStats = df_loanstatus_modded_clean.groupby(["Campaign Name", "Mail Date"], as_index=False).agg({
@@ -211,7 +210,7 @@ def generate_maildata():
 
     # Rename columns for clarity
     FundedStats.rename(columns={
-        "funded_flag": "Funded",
+        "funded_flag": "Fundings",
         "withdrawn_flag": "Withdrawn",
         "locked_not_submitted_flag": "LockedNotSubmitted",
         "total": "Locks"
@@ -247,7 +246,7 @@ def generate_maildata():
     # Now merge safely
     MailData = MailData_prep.merge(FundedStats, on=["Campaign Name", "Mail Date"], how="left")
     MailData.sort_values(by=["Campaign Name", "Mail Date"], inplace=True)
-    numeric_cols = ["Calls", "Funded", "Withdrawn", "LockedNotSubmitted", "Locks"]
+    numeric_cols = ["Calls", "Fundings", "Withdrawn", "LockedNotSubmitted", "Locks"]
     MailData[numeric_cols] = MailData[numeric_cols].fillna(0)
     MailData[numeric_cols] = MailData[numeric_cols].astype(int)
 
@@ -260,7 +259,7 @@ def generate_maildata():
     ).round(4)
 
     # Calls to Lock = LockedNotSubmitted / Calls
-    MailData["Calls to Lock"] = np.where(
+    MailData["Call to Lock"] = np.where(
         (MailData["Calls"] == 0),
         0,
         MailData["Locks"] / MailData["Calls"]
@@ -270,9 +269,9 @@ def generate_maildata():
     MailData["Lock to Fund"] = np.where(
         (MailData["Locks"] == 0),
         0,
-        MailData["Funded"] / MailData["Locks"]
+        MailData["Fundings"] / MailData["Locks"]
     ).round(4)
-
+    print("✅ Generated MailData")
     MailData["Total Mail Pieces"] = MailData["Total Mail Pieces"].fillna(0).astype(int)
 
     return MailData

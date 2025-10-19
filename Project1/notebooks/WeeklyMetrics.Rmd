@@ -1,0 +1,292 @@
+---
+title: "Weekly Metrics"
+author: "Mark Faynboym"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    theme: yeti
+    highlight: pygments
+    toc_float: true
+    df_print: paged
+    number_sections: no  
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(lubridate)
+library(plotly)
+library(knitr)
+library(kableExtra)
+library(DT)
+library(patchwork)
+library(dplyr)
+library(scales)
+```
+
+
+```{r}
+# Load MailData.csv from 'data/processed' folder
+weeklyLOS_data <- read_csv("../../data/raw/weekly_LOS/LOS1012_1018.csv")
+CRM_data <- read_csv("../../data/raw/Leads_CRM.csv")
+weeklyCRM_data <-  CRM_data %>% 
+  mutate(Call_date = as.Date(`Created On`)) %>% 
+  filter(Call_date >= as.Date("2025-10-12")) %>%
+  separate(`Lead Contact`, into = c("Last", "First"), sep = ", ", remove = FALSE) %>%
+  mutate(`Lead Contact` = paste(First, Last)) %>% 
+  select(`Lead Contact`, `Status`, `Loan Amount...17`)
+```
+
+
+```{r}
+# rename columns for rbind
+LOS_cols_selected <- weeklyLOS_data %>% 
+  select(`Loan Officer`, `Current Status`, `Loan Amount`) %>% 
+  rename(`Status` = `Current Status`)
+CRM_cols_selected <- weeklyCRM_data %>%
+  rename(
+  `Loan Amount` = `Loan Amount...17`,
+  `Loan Officer` = `Lead Contact`
+)
+
+
+combined_df <- rbind(LOS_cols_selected, CRM_cols_selected)
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Generate columns
+combined_df_summary <- combined_df %>%
+  group_by(`Loan Officer`) %>%
+  summarise(
+    Calls = n(),
+    Fundings = sum(`Status` == "Funded", na.rm = TRUE),
+    `Total Loan Amount Funded` =sum(`Loan Amount`[Status == "Funded"], na.rm = TRUE),
+    Withdrawn = sum(`Status` == "Withdrawn", na.rm = TRUE),
+    Denied = sum(`Status` == "Denied", na.rm = TRUE),
+    Processing = sum(`Status` == "Processing", na.rm = TRUE),
+    Locked_Not_Submitted = sum(`Status` == "Locked Not Submitted", na.rm = TRUE)
+  ) %>%
+  bind_rows(
+    summarise(
+      #Create Totals row
+      .,
+      `Loan Officer` = "Total",
+      Calls = sum(Calls, na.rm = TRUE),
+      Fundings = sum(Fundings, na.rm = TRUE),
+      `Total Loan Amount Funded` = sum(`Total Loan Amount Funded`, na.rm = TRUE),
+      Withdrawn = sum(Withdrawn, na.rm = TRUE),
+      Denied = sum(Denied, na.rm = TRUE),
+      Processing = sum(Processing, na.rm = TRUE),
+      Locked_Not_Submitted = sum(Locked_Not_Submitted, na.rm = TRUE)
+    ) 
+  ) %>% 
+# sort by Total Loan Amount Funded
+  mutate(is_total = `Loan Officer` == "Total") %>%
+  arrange(is_total, desc(`Total Loan Amount Funded`)) %>%
+  select(-is_total) %>% 
+  mutate(`Total Loan Amount Funded` = dollar(`Total Loan Amount Funded`))
+```
+
+```{r}
+library(knitr)
+library(kableExtra)
+
+combined_df_summary %>%
+  kable(format = "html", caption = "Loan Officer Summary") %>%
+  kable_styling(
+    full_width = FALSE,
+    bootstrap_options = c("striped", "hover", "condensed"),
+    position = "center"
+  ) %>%
+  row_spec(0, background = "#d8cce2", color = "black") %>%  # grey-purple header
+  row_spec(nrow(combined_df_summary), extra_css = "border-top: 2px solid black;")
+```
+
+
+
+
+<br><br><br>
+
+
+
+
+
+
+
+```{r}
+
+# Prepare data
+plot_df <- combined_df_summary %>%
+  filter(`Loan Officer` != "Total") %>%
+  mutate(Calls = as.numeric(Calls))
+
+# Identify max value
+max_calls <- max(plot_df$Calls, na.rm = TRUE)
+
+# Assign colors
+plot_df <- plot_df %>%
+  mutate(bar_color = ifelse(Calls == max_calls, "#35608b", "#add8e6"))  # dark blue for max
+
+# Plot
+ggplot(plot_df, aes(x = `Loan Officer`, y = Calls, fill = bar_color)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = Calls), vjust = -0.5, size = 4) +
+  scale_fill_identity() +
+  scale_y_continuous(
+    breaks = seq(0, max_calls + 5, by = 5),
+    limits = c(0, max_calls + 5)  # extend y-axis to give headroom
+  ) +
+  labs(
+    title = "Weekly Call Volume by Loan Officer",
+    x = "Loan Officer",
+    y = "Number of Calls"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+<br><br><br>
+
+```{r}
+
+# Prepare data
+plot_df <- combined_df_summary %>%
+  filter(`Loan Officer` != "Total") %>%
+  mutate(Calls = as.numeric(Calls))
+
+# Identify max value
+max_calls <- max(plot_df$Calls, na.rm = TRUE)
+
+# Assign colors
+plot_df <- plot_df %>%
+  mutate(bar_color = ifelse(Calls == max_calls, "#35608b", "#add8e6"))  # dark blue for max
+
+# Plot
+ggplot(plot_df, aes(y = `Loan Officer`, x = Calls, fill = bar_color)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = Calls), hjust = -0.2, size = 4) +  # adjust label position for horizontal
+  scale_fill_identity() +
+  scale_x_continuous(
+    breaks = seq(0, max_calls + 5, by = 5),
+    limits = c(0, max_calls + 5)
+  ) +
+  labs(
+    title = "Weekly Call Volume by Loan Officer",
+    x = "Number of Calls",
+    y = ""
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.text.y = element_text(size = 10)
+  )
+```
+
+
+<br><br><br>
+
+
+
+
+
+
+
+```{r}
+# Prepare data
+plot_df <- combined_df_summary %>%
+  filter(`Loan Officer` != "Total") %>%
+  mutate(`Total Loan Amount Funded` = parse_number(`Total Loan Amount Funded`))
+
+# Identify max value for conditional coloring
+max_value <- max(plot_df$`Total Loan Amount Funded`, na.rm = TRUE)
+
+plot_df <- plot_df %>%
+  mutate(bar_color = ifelse(`Total Loan Amount Funded` == max_value, "#2e8b57", "#90ee90"))  # darker green for max
+
+# Plot
+ggplot(plot_df, aes(x = `Loan Officer`, y = `Total Loan Amount Funded`, fill = bar_color)) +
+  geom_bar(stat = "identity") +
+  geom_text(
+    aes(label = dollar(`Total Loan Amount Funded`, accuracy = 1)),
+    vjust = -0.5,
+    size = 4
+  ) +
+  scale_fill_identity() +
+  scale_y_continuous(
+    labels = dollar_format(scale = 1),
+    breaks = seq(0, max_value * 1.1, by = 100000),
+    limits = c(0, max_value * 1.15)  # add headroom for labels
+  ) +
+  labs(
+    title = "Total Loan Amount Funded by Loan Officer",
+    x = "",
+    y = "Loan Amount ($)"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+<br><br><br>
+
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(scales)
+
+# Prepare data
+plot_df <- combined_df_summary %>%
+  filter(`Loan Officer` != "Total") %>%
+  mutate(`Total Loan Amount Funded` = parse_number(`Total Loan Amount Funded`))
+
+# Identify max value for conditional coloring
+max_value <- max(plot_df$`Total Loan Amount Funded`, na.rm = TRUE)
+
+plot_df <- plot_df %>%
+  mutate(bar_color = ifelse(`Total Loan Amount Funded` == max_value, "#2e8b57", "#90ee90"))  # darker green for max
+
+# Plot
+ggplot(plot_df, aes(y = `Loan Officer`, x = `Total Loan Amount Funded`, fill = bar_color)) +
+  geom_bar(stat = "identity") +
+  geom_text(
+    aes(label = dollar(`Total Loan Amount Funded`, accuracy = 1)),
+    hjust = -0.1,
+    size = 4
+  ) +
+  scale_fill_identity() +
+  scale_x_continuous(
+    labels = dollar_format(scale = 1),
+    breaks = seq(0, max_value * 1.1, by = 100000),
+    limits = c(0, max_value * 1.15)
+  ) +
+  labs(
+    title = "Total Loan Amount Funded by Loan Officer",
+    x = "Loan Amount ($)",
+    y = ""
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.text.y = element_text(size = 10)
+  )
+
+```
+
+
+
